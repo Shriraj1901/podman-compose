@@ -1,0 +1,1 @@
+Networks created by `podman-compose` now carry the `com.docker.compose.network` label, as required by the compose specification. Without it `docker compose` refuses to reuse a network that `podman-compose` created.

@@ -1,6 +1,9 @@
+import subprocess
 import unittest
 from typing import Any
+from unittest import mock
 
+from podman_compose import assert_cnt_nets
 from podman_compose import get_network_create_args
 
 
@@ -28,6 +31,23 @@ class TestGetNetworkCreateArgs(unittest.TestCase):
             net_name,
         ]
         args = get_network_create_args(net_desc, proj_name, net_name)
+        self.assertEqual(args, expected_args)
+
+    def test_compose_network_label(self) -> None:
+        net_desc = self.get_minimal_net_desc()
+        proj_name = "test_project"
+        net_name = "test_project_default"
+        expected_args = [
+            "create",
+            "--label",
+            f"io.podman.compose.project={proj_name}",
+            "--label",
+            f"com.docker.compose.project={proj_name}",
+            "--label",
+            "com.docker.compose.network=default",
+            net_name,
+        ]
+        args = get_network_create_args(net_desc, proj_name, net_name, "default")
         self.assertEqual(args, expected_args)
 
     def test_ipv6(self) -> None:
@@ -275,3 +295,22 @@ class TestGetNetworkCreateArgs(unittest.TestCase):
         ]
         args = get_network_create_args(net_desc, proj_name, net_name)
         self.assertEqual(args, expected_args)
+
+
+class TestAssertCntNetsLabel(unittest.IsolatedAsyncioTestCase):
+    async def test_created_network_gets_compose_network_label(self) -> None:
+        compose = mock.Mock()
+        compose.project_name = "proj"
+        compose.default_net = "default"
+        compose.networks = {"default": {}}
+        compose.x_podman = {}
+        compose.format_name.return_value = "proj_default"
+        compose.podman.output = mock.AsyncMock(
+            side_effect=[subprocess.CalledProcessError(1, "podman"), b"", b""]
+        )
+
+        await assert_cnt_nets(compose, {"_service": "web"})
+
+        create_call = compose.podman.output.await_args_list[1]
+        self.assertEqual(create_call.args[1], "network")
+        self.assertIn("com.docker.compose.network=default", create_call.args[2])
