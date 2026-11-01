@@ -1,0 +1,1 @@
+`podman-compose port` now prints the host address together with the port (e.g. `0.0.0.0:8080`), like `docker compose port` and `podman port`, instead of the port alone.
