@@ -2903,19 +2903,17 @@ class PodmanCompose:
         target = [target_service] if target_service else target_services or []
 
         compose: dict[str, Any] = {}
-        # Iterate over files primitively to allow appending to files in-loop
-        files_iter = iter(files)
+        # Iterate over files by index to allow inserting included files in-loop
+        file_idx = 0
         # Track files appended by ``include:`` so we can resolve their
         # relative paths against the included file's directory per the
         # Compose Spec, without changing the legacy merge behavior of
         # files passed directly via ``-f``.
         include_origin_files: set[str] = set()
 
-        while True:
-            try:
-                filename = next(files_iter)
-            except StopIteration:
-                break
+        while file_idx < len(files):
+            filename = files[file_idx]
+            file_idx += 1
 
             if filename.strip().split('/')[-1] == '-':
                 content = load_yaml_or_die(filename, sys.stdin)
@@ -3010,11 +3008,13 @@ class PodmanCompose:
                         raise RuntimeError(
                             "Items in `include` must be strings or dictionaries with a 'path' key"
                         )
-                files.extend(new_includes)
+                # Included files go right after the file that includes them, so files given
+                # later with ``-f`` (e.g. an override file) are still merged on top of them.
+                files[file_idx:file_idx] = new_includes
                 include_origin_files.update(new_includes)
                 # As compose obj is updated and tested with every loop, not deleting `include`
                 # from it, results in it being tested again and again, original values for
-                # `include` be appended to `files`, and, included files be processed for ever.
+                # `include` be inserted into `files`, and, included files be processed for ever.
                 # Solution is to remove 'include' key from compose obj. This doesn't break
                 # having `include` present and correctly processed in included files
                 del compose["include"]

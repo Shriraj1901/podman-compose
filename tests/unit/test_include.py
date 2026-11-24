@@ -64,6 +64,26 @@ class TestIncludeDict(unittest.TestCase):
         for svc in expected_included_services:
             self.assertIn(svc, self.podman_compose.services)
 
+    def test_override_file_is_merged_after_included_files(self) -> None:
+        self.write_yaml(
+            "test-compose-include.yaml",
+            {"services": {"web": {"image": "nginx:alpine", "command": ["run", "test"]}}},
+        )
+        self.write_yaml("test-compose-main.yaml", {"include": ["./test-compose-include.yaml"]})
+        self.write_yaml(
+            "test-compose-override.yaml",
+            {"services": {"web": {"command": ["run", "ALL", "test"]}}},
+        )
+        self.podman_compose.global_args.file = [
+            "test-compose-main.yaml",
+            "test-compose-override.yaml",
+        ]
+
+        self.podman_compose._parse_compose_file()
+
+        self.assertEqual(self.podman_compose.services["web"]["command"], ["run", "ALL", "test"])
+        self.assertEqual(self.podman_compose.services["web"]["image"], "nginx:alpine")
+
     @parameterized.expand([
         ("not_a_list", {"path": {"./test-compose-include.yaml"}}, "`include` must be a list"),
         (

@@ -1,0 +1,1 @@
+Files included with `include:` are now merged right after the file that includes them, so compose files passed later with `-f` (for example an override file) take precedence over them. Previously the included files were merged last and silently overrode the override files.
